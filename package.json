@@ -2,6 +2,7 @@
   "name": "mdexecutor",
   "displayName": "mdexecutor",
   "publisher": "YuxiHong",
+  "repository":"https://github.com/hongyx11/mdexecutor.git",
   "description": "",
   "version": "0.0.1",
   "engines": {
