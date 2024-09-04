@@ -4,7 +4,7 @@
   "publisher": "YuxiHong",
   "repository":"https://github.com/hongyx11/mdexecutor.git",
   "description": "",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "engines": {
     "vscode": "^1.91.0"
   },

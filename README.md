@@ -1,68 +1,42 @@
----
-header-includes:
-  - \usepackage[ruled,vlined,linesnumbered]{algorithm2e}
----
-# Algorithm 1
-Just a sample algorithmn
-\begin{algorithm}[H]
-\DontPrintSemicolon
-\SetAlgoLined
-\KwResult{Write here the result}
-\SetKwInOut{Input}{Input}\SetKwInOut{Output}{Output}
-\Input{Write here the input}
-\Output{Write here the output}
-\BlankLine
-\While{While condition}{
-    instructions\;
-    \eIf{condition}{
-        instructions1\;
-        instructions2\;
-    }{
-        instructions3\;
-    }
-}
-\caption{first algorithm}
-\label{algo:algo1}
-\end{algorithm} 
+# Markdown Executor 
+
+This is a tool to execute markdown code blocks in VS Code. 
+We have workflow associated with the code we are developing.
+
+They are usually some code snippets that we need to execute and test many many times. 
+It is tedious to copy and paste the code into the terminal and run it. Putting these code somewhere else may also require extra efforts to remember where the code is.
+
+This tool will help us to execute the code blocks in VS Code. 
+It will detect the **bash** code blocks of an open markdown file and execute them in the terminal. 
+
+You can use this tools as a reccord of your workflow to your project. You will see your workflow with your code together.
 
 
+## usage 
+put the cursor in between your code block and `ctl+shift+p` select command `runcodeblock`.
+The code block will be executed in the terminal.
 
-helo Algorithm \ref{algo:algo1}
-
-
-# mdexecutor 
-
-
-hello world
-
-
-
-## package 
+### label of code block
+The first line of bash code block must be `#jobname this_bash_code_block_jobname`. e.g. 
 ```bash
-vsce package 
+#jobname readme
+echo "hello world"
 ```
 
-## install package 
+You can have depedent jobs by adding `#dep` label in the second line of the code block. e.g. 
 ```bash
-
+#jobname j2
+#dep readme
+echo "hello j2 after hello world"
 ```
+The terminal will execute the code block (jobname j2) after the dependent job (readme) is completed. Multiply depedencies should be executed in order.
 
-```{.algorithm}
-\begin{algorithmic}
-\STATE \textbf{Input:} $x$
-\STATE \textbf{Output:} $y$
-\STATE $y \leftarrow x + 1$
-\STATE \textbf{Return} $y$
-\end{algorithmic}
 
-## git operation
+### init environment
+You can also specify init bash commands of your environment by specify the jobname as `initenv`.
+e.g.
 ```bash
-#jobname gitupload
-cd /Users/hongy0a/Documents/CodeOnMac/mdexecutor && \
-git add . && git commit -m "remove warning" && git push && \
-cd - 
+#jobname initenv
 ```
-
-
 
 
