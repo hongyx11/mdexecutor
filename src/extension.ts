@@ -1,72 +1,124 @@
 // The module 'vscode' contains the VS Code extensibility API
 // Import the module and reference it with the alias vscode in your code below
+import { CompressionStream } from 'stream/web';
 import * as vscode from 'vscode';
 
 // This method is called when your extension is activated
 // Your extension is activated the very first time the command is executed
 export function activate(context: vscode.ExtensionContext) {
+    console.log('Extension "your-extension-name" is now active!');
     const bashCommandsMap = new Map<string, { command: string, dependencies: string[] }>();
-    const runcodeblock = vscode.commands.registerCommand("mdexecutor.runcodeblock", () => {
-    const editor = vscode.window.activeTextEditor;
-    if (editor) {
-        const position = editor.selection.active;
-        const line = editor.document.lineAt(position.line);
-        // vscode.window.showInformationMessage(`Running command linked to: ${line.text.trim()}`);
-        // search starts from the current line and expand both upwards and downwards
-        // it will search for ```bash and ``` and return the text (commands) in between.
-        const commandtext = findBashBlock(editor.document,line.lineNumber);
-        // console.log(commandtext);
-        if(commandtext == null) return;
-        
+    // 
+    let initenved = false;
 
-        if (commandtext != null){
+    const runcodeblock = vscode.commands.registerCommand("mdexecutor.runcodeblock", () => {
+        const editor = vscode.window.activeTextEditor;
+        if (editor) {
+            if(!initenved){
+                vscode.commands.executeCommand("mdexecutor.mdinit");
+                initenved = true;
+            }
+            const extractedCommands = ExtractAllBashBlocks(editor.document);
+            for (const [jobName, command] of extractedCommands) {
+                bashCommandsMap.set(jobName, command);
+            }
+            const position = editor.selection.active;
+            const line = editor.document.lineAt(position.line);
+            // vscode.window.showInformationMessage(`Running command linked to: ${line.text.trim()}`);
+            // search starts from the current line and expand both upwards and downwards
+            // it will search for ```bash and ``` and return the text (commands) in between.
+            let commandtext = findBashBlock(editor.document,line.lineNumber);
+            // get current jobname
+            const jobname = ExtractJobName(commandtext);
+            if(jobname == null){
+                return;
+            }
+            // show terminal 
             let terminal = getExistingTerminal("mdexecutor");
             terminal = terminal ?? vscode.window.createTerminal('mdexecutor');
             terminal.show();
-            // Extract dependencies
-            const dependencies: string[] = [];
-            const depMatches = commandtext.matchAll(/#dep\s+(\S+)/g);
-            for (const depMatch of depMatches) {
-                const dep = depMatch[1];
-                if (bashCommandsMap.has(dep)) {
-                    const depCommand = bashCommandsMap.get(dep)?.command;
+            // console.log(bashCommandsMap)
+            for (const depMatch of bashCommandsMap.get(jobname)?.dependencies ?? []) {
+                if (bashCommandsMap.has(depMatch)) {
+                    // console.log("dep and bashcommands", depMatch, bashCommandsMap.get(depMatch));
+                    const depCommand = bashCommandsMap.get(depMatch)?.command;
                     if (depCommand) {
                         terminal.sendText(depCommand);
                     }
                 } else {
-                    vscode.window.showWarningMessage(`Dependency "${dep}" not found.`);
+                    vscode.window.showWarningMessage(`Dependency "${depMatch}" not found.`);
                 }
             }
-            terminal.sendText(commandtext);
+            terminal.sendText(bashCommandsMap.get(jobname)?.command ?? "");
         }
-    }   
-    }); 
+        }); 
+    
+        const mdinit = vscode.commands.registerCommand("mdexecutor.mdinit", () => {
+            // console.log("call_mdinit");
+            const activeEditor = vscode.window.activeTextEditor;
 
-    const updatebashcode = vscode.commands.registerCommand("mdexecutor.updateworkflow", () => {
-        const activeEditor = vscode.window.activeTextEditor;
-        if(activeEditor == null) return;
-        const document = activeEditor.document;
-        console.log("we are saveing a file");
-        if (document.languageId === 'markdown') {
-            console.log("we are processing a markdown file");
-            const extractedCommands = extractBashCommands(document);
+            if (!activeEditor){
+                console.log("no active editor");
+                return;
+            }
+            const document = activeEditor.document;
+            // console.log(document.languageId);
+            if(document.languageId !== 'markdown'){
+                return ;
+            }
+            const extractedCommands = ExtractAllBashBlocks(document);
             for (const [jobName, command] of extractedCommands) {
                 bashCommandsMap.set(jobName, command);
             }
+            if(bashCommandsMap.has('initenv') && initenved == false){
+                let terminal = getExistingTerminal("mdexecutor");
+                terminal = terminal ?? vscode.window.createTerminal('mdexecutor');
+                terminal.show();
+                const tmp = bashCommandsMap.get('initenv');
+                if(tmp == null){
+                    return;
+                }
+                terminal.sendText(tmp.command);
+                initenved = true;
+            }
+        });
+    
 
-            // Optional: log the results or perform additional actions
-            console.log('Bash commands saved:', bashCommandsMap);
-        }
-    });    
+    // // Trigger when a text document is opened
+    // vscode.workspace.onDidChangeTextDocument(() => {
+    //     const editor = vscode.window.activeTextEditor;
+    //     if(!editor) return;
+    //     // if I'm in a bash code block, trigger mdinit
+    //     if(InBashBlock(editor.document, editor.selection.active.line)) {
+    //         vscode.commands.executeCommand("mdexecutor.mdinit");
+    //     }else{
+    //     }
+    // });
+
+
 
     context.subscriptions.push(
         runcodeblock, 
-        updatebashcode
+        mdinit
     );
 }
 
+function ExtractJobName(bashcommand: string | null)
+{
+    if(bashcommand == null){
+        return null;
+    }
+    // Extract job name
+    const jobNameMatch = bashcommand.match(/#jobname\s+(\S+)/);
+    if (!jobNameMatch) {
+        return null;
+    }
+    const jobName = jobNameMatch[1];
+    return jobName;
+}
 
-function extractBashCommands(document: vscode.TextDocument): Map<string, { command: string, dependencies: string[] }> {
+// Extract all bash blocks from current markdown file
+function ExtractAllBashBlocks(document: vscode.TextDocument): Map<string, { command: string, dependencies: string[] }> {
     const commandsMap = new Map<string, { command: string, dependencies: string[] }>();
     const text = document.getText();
     const bashBlockRegex = /```bash([\s\S]*?)```/g;
@@ -76,32 +128,26 @@ function extractBashCommands(document: vscode.TextDocument): Map<string, { comma
         let bashCommand = match[1].trim();
 
         // Extract job name
-        const jobNameMatch = bashCommand.match(/#jobname\s+(\S+)/);
-        if (!jobNameMatch) {
-            continue; // If no job name, skip this block
+        let jobname = ExtractJobName(bashCommand);
+        if(jobname === null){
+            continue;
         }
-        const jobName = jobNameMatch[1];
 
         // Extract dependencies
-        const dependencies: string[] = [];
-        const depMatches = [...bashCommand.matchAll(/#dep\s+(\S+)/g)];
-        for (const depMatch of depMatches) {
-            dependencies.push(depMatch[1]);
-        }
+        const depMatches = bashCommand.match(/#dep\s+(.+)/);
+        const depsArray = depMatches ? depMatches[1].split(/\s+/) : [];
         
-        // Remove #jobname line from the bash command
-        bashCommand = bashCommand.replace(/#jobname\s+\S+/, '').trim();
-        // Remove all #dep lines from the bash command
-        bashCommand = bashCommand.replace(/#dep\s+\S+/g, '').trim();
+        const cleanedCommand = bashCommand.replace(/^\s*#.*(\n)?/gm, '');
         // Store the command and its dependencies in the map
-        commandsMap.set(jobName, {
-            command: bashCommand,
-            dependencies: dependencies
+        console.log(commandsMap);
+        commandsMap.set(jobname, {
+            command: cleanedCommand,
+            dependencies: depsArray
         });
     }
-
     return commandsMap;
 }
+
 
 
 
@@ -155,6 +201,8 @@ function getExistingTerminal(name: string): vscode.Terminal | undefined {
     }
     return undefined;
 }
+
+
 
 
 // This method is called when your extension is deactivated
