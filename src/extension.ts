@@ -8,10 +8,9 @@ import * as vscode from 'vscode';
 export function activate(context: vscode.ExtensionContext) {
     console.log('Extension "your-extension-name" is now active!');
     const bashCommandsMap = new Map<string, { command: string, dependencies: string[] }>();
-    // 
     let initenved = false;
 
-    const runcodeblock = vscode.commands.registerCommand("mdexecutor.runcodeblock", () => {
+    const runbashblock = vscode.commands.registerCommand("mdexecutor.runbashblock", () => {
         const editor = vscode.window.activeTextEditor;
         if (editor) {
             if(!initenved){
@@ -30,7 +29,7 @@ export function activate(context: vscode.ExtensionContext) {
             let commandtext = findBashBlock(editor.document,line.lineNumber);
             // get current jobname
             const jobname = ExtractJobName(commandtext);
-            if(jobname == null){
+            if(jobname == null || jobname === "initenv"){
                 return;
             }
             // show terminal 
@@ -83,22 +82,8 @@ export function activate(context: vscode.ExtensionContext) {
             }
         });
     
-
-    // // Trigger when a text document is opened
-    // vscode.workspace.onDidChangeTextDocument(() => {
-    //     const editor = vscode.window.activeTextEditor;
-    //     if(!editor) return;
-    //     // if I'm in a bash code block, trigger mdinit
-    //     if(InBashBlock(editor.document, editor.selection.active.line)) {
-    //         vscode.commands.executeCommand("mdexecutor.mdinit");
-    //     }else{
-    //     }
-    // });
-
-
-
     context.subscriptions.push(
-        runcodeblock, 
+        runbashblock, 
         mdinit
     );
 }
@@ -139,7 +124,6 @@ function ExtractAllBashBlocks(document: vscode.TextDocument): Map<string, { comm
         
         const cleanedCommand = bashCommand.replace(/^\s*#.*(\n)?/gm, '');
         // Store the command and its dependencies in the map
-        console.log(commandsMap);
         commandsMap.set(jobname, {
             command: cleanedCommand,
             dependencies: depsArray

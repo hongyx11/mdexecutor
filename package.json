@@ -4,7 +4,7 @@
   "publisher": "YuxiHong",
   "repository":"https://github.com/hongyx11/mdexecutor.git",
   "description": "",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "engines": {
     "vscode": "^1.91.0"
   },
@@ -19,11 +19,11 @@
     "commands": [
       {
         "command": "mdexecutor.mdinit",
-        "title": "mdinit"
+        "title": "MdExecutor.mdinit"
       },
       {
-        "command": "mdexecutor.runcodeblock",
-        "title": "runcodeblock"
+        "command": "mdexecutor.runbashblock",
+        "title": "MdExecutor.runbashblock"
       }
     ]
   },
