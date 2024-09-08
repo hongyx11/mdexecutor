@@ -9,9 +9,15 @@ export function activate(context: vscode.ExtensionContext) {
     console.log('Extension "your-extension-name" is now active!');
     const bashCommandsMap = new Map<string, { command: string, dependencies: string[] }>();
     let initenved = false;
-
+    let currentfilename: string | undefined = undefined;
     const runbashblock = vscode.commands.registerCommand("mdexecutor.runbashblock", () => {
         const editor = vscode.window.activeTextEditor;
+        let tmpfilename = editor?.document.fileName;
+        if(tmpfilename !== currentfilename){
+            console.log("new file open, reset initenved", tmpfilename, currentfilename)
+            initenved = false;
+            currentfilename = tmpfilename;
+        }
         if (editor) {
             if(!initenved){
                 vscode.commands.executeCommand("mdexecutor.mdinit");
@@ -50,38 +56,47 @@ export function activate(context: vscode.ExtensionContext) {
             }
             terminal.sendText(bashCommandsMap.get(jobname)?.command ?? "");
         }
-        }); 
+    }); 
     
-        const mdinit = vscode.commands.registerCommand("mdexecutor.mdinit", () => {
-            // console.log("call_mdinit");
-            const activeEditor = vscode.window.activeTextEditor;
+    const mdinit = vscode.commands.registerCommand("mdexecutor.mdinit", () => {
+        // console.log("call_mdinit");
+        const activeEditor = vscode.window.activeTextEditor;
 
-            if (!activeEditor){
-                console.log("no active editor");
+        if (!activeEditor){
+            console.log("no active editor");
+            return;
+        }
+        const document = activeEditor.document;
+        // console.log(document.languageId);
+        if(document.languageId !== 'markdown'){
+            return ;
+        }
+        const extractedCommands = ExtractAllBashBlocks(document);
+        for (const [jobName, command] of extractedCommands) {
+            bashCommandsMap.set(jobName, command);
+        }
+        if(bashCommandsMap.has('initenv') && initenved == false){
+            let terminal = getExistingTerminal("mdexecutor");
+            terminal = terminal ?? vscode.window.createTerminal('mdexecutor');
+            terminal.show();
+            const tmp = bashCommandsMap.get('initenv');
+            if(tmp == null){
                 return;
             }
-            const document = activeEditor.document;
-            // console.log(document.languageId);
-            if(document.languageId !== 'markdown'){
-                return ;
+            terminal.sendText(tmp.command);
+            initenved = true;
+        }
+    });
+
+    context.subscriptions.push(
+        vscode.workspace.onDidOpenTextDocument( (document)=>{
+            if(document.languageId === 'markdown'){
+                initenved = false;
+                console.log("md file open, reset initenved");
             }
-            const extractedCommands = ExtractAllBashBlocks(document);
-            for (const [jobName, command] of extractedCommands) {
-                bashCommandsMap.set(jobName, command);
-            }
-            if(bashCommandsMap.has('initenv') && initenved == false){
-                let terminal = getExistingTerminal("mdexecutor");
-                terminal = terminal ?? vscode.window.createTerminal('mdexecutor');
-                terminal.show();
-                const tmp = bashCommandsMap.get('initenv');
-                if(tmp == null){
-                    return;
-                }
-                terminal.sendText(tmp.command);
-                initenved = true;
-            }
-        });
-    
+        })
+    );
+
     context.subscriptions.push(
         runbashblock, 
         mdinit
